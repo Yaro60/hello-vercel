@@ -1,1 +1,579 @@
-<!DOCTYPE html><html><head><title>OpenClaw Hello World</title></head><body><h1>Wdrożone z OpenClaw 🦞</h1><p>Vercel + GitHub + SAL w akcji.</p></body></html>
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Retro Pixel Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #050509;
+      --panel: #0c0f1f;
+      --panel-2: #121632;
+      --grid: rgba(82, 255, 188, 0.15);
+      --accent: #52ffbc;
+      --accent-2: #ff8f5f;
+      --accent-3: #69a7ff;
+      --danger: #ff5f7a;
+      --glow: rgba(82, 255, 188, 0.55);
+      --text: #d9ffe9;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      background: radial-gradient(circle at top, #11162d 0%, #06060f 45%, #020205 100%);
+      color: var(--text);
+      font-family: "VT323", monospace;
+      letter-spacing: 0.5px;
+      overflow-x: hidden;
+    }
+
+    .bg-canvas,
+    .fx-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .scanlines {
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.02) 0px,
+        rgba(255, 255, 255, 0.02) 1px,
+        rgba(0, 0, 0, 0) 2px,
+        rgba(0, 0, 0, 0) 4px
+      );
+      mix-blend-mode: screen;
+      opacity: 0.25;
+      animation: scan 8s linear infinite;
+    }
+
+    .vignette {
+      background: radial-gradient(circle at center, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.55) 100%);
+    }
+
+    .dashboard {
+      position: relative;
+      z-index: 2;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px 24px 48px;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .title {
+      font-family: "Press Start 2P", cursive;
+      font-size: 20px;
+      text-transform: uppercase;
+      text-shadow: 0 0 12px var(--glow);
+    }
+
+    .subtitle {
+      margin-top: 8px;
+      font-size: 18px;
+      color: var(--accent-3);
+    }
+
+    .status-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: rgba(82, 255, 188, 0.1);
+      border: 1px solid rgba(82, 255, 188, 0.3);
+      color: var(--accent);
+      font-size: 16px;
+      text-transform: uppercase;
+      box-shadow: 0 0 12px rgba(82, 255, 188, 0.25);
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+
+    .chip.danger {
+      color: var(--danger);
+      border-color: rgba(255, 95, 122, 0.4);
+      background: rgba(255, 95, 122, 0.12);
+      box-shadow: 0 0 12px rgba(255, 95, 122, 0.3);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+    }
+
+    .panel {
+      position: relative;
+      padding: 18px;
+      background: linear-gradient(145deg, var(--panel), var(--panel-2));
+      border: 2px solid rgba(82, 255, 188, 0.35);
+      box-shadow: inset 0 0 22px rgba(0, 0, 0, 0.6), 0 0 18px rgba(82, 255, 188, 0.12);
+      overflow: hidden;
+    }
+
+    .panel::before {
+      content: "";
+      position: absolute;
+      inset: 8px;
+      border: 1px dashed rgba(82, 255, 188, 0.25);
+      opacity: 0.65;
+      pointer-events: none;
+    }
+
+    .panel h3 {
+      font-family: "Press Start 2P", cursive;
+      font-size: 14px;
+      margin-bottom: 12px;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+
+    .panel .meta {
+      font-size: 16px;
+      color: var(--accent-3);
+      margin-bottom: 8px;
+    }
+
+    .stat-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .stat {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 18px;
+    }
+
+    .stat .bar {
+      position: relative;
+      flex: 1;
+      height: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      margin-left: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      overflow: hidden;
+    }
+
+    .stat .bar span {
+      position: absolute;
+      inset: 0;
+      transform-origin: left;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      animation: load 3s ease-in-out infinite;
+    }
+
+    .stat:nth-child(2) .bar span { animation-delay: 0.6s; }
+    .stat:nth-child(3) .bar span { animation-delay: 1.2s; }
+
+    .log {
+      font-size: 16px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .log div {
+      padding: 6px 8px;
+      background: rgba(82, 255, 188, 0.08);
+      border-left: 3px solid var(--accent);
+      animation: flicker 4s infinite;
+    }
+
+    .log div:nth-child(2n) {
+      border-left-color: var(--accent-2);
+      color: #ffd6c2;
+    }
+
+    .scope-wrap {
+      display: grid;
+      gap: 10px;
+    }
+
+    .scope {
+      width: 100%;
+      height: 140px;
+      border: 1px solid rgba(82, 255, 188, 0.3);
+      background: #05070f;
+      image-rendering: pixelated;
+    }
+
+    .mini-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 6px;
+    }
+
+    .pixel-block {
+      height: 24px;
+      background: rgba(82, 255, 188, 0.18);
+      border: 1px solid rgba(82, 255, 188, 0.3);
+      animation: blink 2s steps(2, end) infinite;
+    }
+
+    .pixel-block:nth-child(3n) {
+      animation-delay: 0.4s;
+      background: rgba(255, 143, 95, 0.18);
+      border-color: rgba(255, 143, 95, 0.4);
+    }
+
+    .pixel-block:nth-child(4n) {
+      animation-delay: 0.8s;
+      background: rgba(105, 167, 255, 0.18);
+      border-color: rgba(105, 167, 255, 0.4);
+    }
+
+    .footer {
+      margin-top: 22px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 16px;
+    }
+
+    .footer span {
+      color: var(--accent-3);
+    }
+
+    .chip .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 8px currentColor;
+      display: inline-block;
+    }
+
+    .glitch {
+      position: relative;
+      display: inline-block;
+    }
+
+    .glitch::before,
+    .glitch::after {
+      content: attr(data-text);
+      position: absolute;
+      left: 0;
+      top: 0;
+      opacity: 0.8;
+      mix-blend-mode: screen;
+      animation: glitch 2.8s infinite;
+    }
+
+    .glitch::before {
+      color: var(--accent-2);
+      transform: translate(2px, -1px);
+    }
+
+    .glitch::after {
+      color: var(--accent-3);
+      transform: translate(-2px, 1px);
+      animation-delay: 0.2s;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.85; }
+      50% { opacity: 1; }
+    }
+
+    @keyframes load {
+      0% { transform: scaleX(0.3); }
+      50% { transform: scaleX(0.9); }
+      100% { transform: scaleX(0.4); }
+    }
+
+    @keyframes flicker {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 0.9; }
+      50% { opacity: 0.3; }
+    }
+
+    @keyframes scan {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(40px); }
+    }
+
+    @keyframes glitch {
+      0%, 100% { clip-path: inset(0 0 0 0); }
+      20% { clip-path: inset(0 0 60% 0); }
+      40% { clip-path: inset(20% 0 20% 0); }
+      60% { clip-path: inset(60% 0 0 0); }
+      80% { clip-path: inset(10% 0 40% 0); }
+    }
+
+    @media (max-width: 720px) {
+      header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .title {
+        font-size: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="bg" class="bg-canvas"></canvas>
+  <div class="fx-layer scanlines"></div>
+  <div class="fx-layer vignette"></div>
+
+  <div class="dashboard">
+    <header>
+      <div>
+        <div class="title glitch" data-text="NEON GRID OPS">NEON GRID OPS</div>
+        <div class="subtitle">Pixel Retro Mission Control</div>
+      </div>
+      <div class="status-row">
+        <div class="chip"><span class="dot"></span>SYNC ON</div>
+        <div class="chip"><span class="dot"></span>CORE 98%</div>
+        <div class="chip danger"><span class="dot"></span>HEAT 71%</div>
+      </div>
+    </header>
+
+    <section class="grid">
+      <article class="panel">
+        <h3>System Core</h3>
+        <div class="meta">Node VX-77 / OS: VCRT 4.2</div>
+        <div class="stat-list">
+          <div class="stat">CPU LOAD<div class="bar"><span></span></div></div>
+          <div class="stat">MEMORY<div class="bar"><span></span></div></div>
+          <div class="stat">GRID UPLINK<div class="bar"><span></span></div></div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <h3>Signal Monitor</h3>
+        <div class="scope-wrap">
+          <canvas id="scope" class="scope"></canvas>
+          <div class="mini-grid">
+            <div class="pixel-block"></div>
+            <div class="pixel-block"></div>
+            <div class="pixel-block"></div>
+            <div class="pixel-block"></div>
+            <div class="pixel-block"></div>
+            <div class="pixel-block"></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <h3>Mission Log</h3>
+        <div class="log" id="log">
+          <div>12:01 // SUBSYSTEM AWAKE</div>
+          <div>12:04 // QUANTUM PATH LOCKED</div>
+          <div>12:05 // REMOTE SYNTH LINKED</div>
+          <div>12:08 // THRUST VECTOR CALIBRATED</div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <h3>Sector Map</h3>
+        <div class="meta">Grid: 14A / Drift 0.07</div>
+        <div id="map" style="height: 160px; position: relative; border: 1px solid rgba(105, 167, 255, 0.35); background: #05070f;"></div>
+      </article>
+    </section>
+
+    <div class="footer">
+      <div>Uptime: <span id="uptime">00:00:00</span></div>
+      <div>Local Time: <span id="clock">--:--:--</span></div>
+      <div>Signal Drift: <span id="drift">0.000</span></div>
+    </div>
+  </div>
+
+  <script>
+    const bg = document.getElementById("bg");
+    const bgCtx = bg.getContext("2d");
+    const scope = document.getElementById("scope");
+    const scopeCtx = scope.getContext("2d");
+
+    const map = document.getElementById("map");
+    const log = document.getElementById("log");
+    const driftEl = document.getElementById("drift");
+    const clockEl = document.getElementById("clock");
+    const uptimeEl = document.getElementById("uptime");
+
+    let startTime = Date.now();
+
+    const starCount = 120;
+    const stars = Array.from({ length: starCount }, () => ({
+      x: Math.random() * 160,
+      y: Math.random() * 90,
+      z: Math.random() * 1 + 0.2,
+      s: Math.random() * 0.6 + 0.2
+    }));
+
+    const lowRes = document.createElement("canvas");
+    const lowCtx = lowRes.getContext("2d");
+
+    function resize() {
+      const dpr = window.devicePixelRatio || 1;
+      bg.width = window.innerWidth * dpr;
+      bg.height = window.innerHeight * dpr;
+      bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      scope.width = scope.clientWidth * dpr;
+      scope.height = scope.clientHeight * dpr;
+      scopeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      lowRes.width = 160;
+      lowRes.height = 90;
+    }
+
+    window.addEventListener("resize", resize);
+    resize();
+
+    function drawBackground(time) {
+      lowCtx.fillStyle = "#04060d";
+      lowCtx.fillRect(0, 0, lowRes.width, lowRes.height);
+
+      lowCtx.strokeStyle = "rgba(82,255,188,0.2)";
+      for (let i = 0; i < 10; i++) {
+        lowCtx.beginPath();
+        lowCtx.moveTo(0, i * 9);
+        lowCtx.lineTo(lowRes.width, i * 9);
+        lowCtx.stroke();
+      }
+
+      stars.forEach((star) => {
+        star.y += star.z * 0.3;
+        if (star.y > lowRes.height) {
+          star.y = 0;
+          star.x = Math.random() * lowRes.width;
+        }
+        lowCtx.fillStyle = `rgba(105, 167, 255, ${0.6 + star.z})`;
+        lowCtx.fillRect(star.x, star.y, star.s, star.s);
+      });
+
+      bgCtx.imageSmoothingEnabled = false;
+      bgCtx.clearRect(0, 0, bg.width, bg.height);
+      const scaleX = window.innerWidth / lowRes.width;
+      const scaleY = window.innerHeight / lowRes.height;
+      bgCtx.drawImage(lowRes, 0, 0, lowRes.width, lowRes.height, 0, 0, lowRes.width * scaleX, lowRes.height * scaleY);
+
+      const glow = (Math.sin(time / 600) + 1) * 0.3;
+      bgCtx.fillStyle = `rgba(82, 255, 188, ${0.08 + glow})`;
+      bgCtx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+    }
+
+    function drawScope(time) {
+      const w = scope.clientWidth;
+      const h = scope.clientHeight;
+      scopeCtx.clearRect(0, 0, w, h);
+
+      scopeCtx.strokeStyle = "rgba(82,255,188,0.3)";
+      scopeCtx.lineWidth = 1;
+      for (let x = 0; x <= w; x += 24) {
+        scopeCtx.beginPath();
+        scopeCtx.moveTo(x, 0);
+        scopeCtx.lineTo(x, h);
+        scopeCtx.stroke();
+      }
+
+      scopeCtx.beginPath();
+      scopeCtx.strokeStyle = "#52ffbc";
+      scopeCtx.lineWidth = 2;
+      for (let x = 0; x < w; x += 6) {
+        const y = h / 2 + Math.sin((x + time / 4) / 18) * 24 + Math.sin((x + time / 2) / 9) * 6;
+        if (x === 0) scopeCtx.moveTo(x, y);
+        else scopeCtx.lineTo(x, y);
+      }
+      scopeCtx.stroke();
+
+      scopeCtx.fillStyle = "rgba(255,143,95,0.8)";
+      for (let x = 0; x < w; x += 24) {
+        const height = (Math.sin((x + time / 8) / 12) + 1.4) * 10;
+        scopeCtx.fillRect(x, h - height - 4, 6, height);
+      }
+    }
+
+    function updateMap(time) {
+      map.innerHTML = "";
+      const points = 18;
+      for (let i = 0; i < points; i++) {
+        const dot = document.createElement("div");
+        const size = 4 + (i % 3);
+        dot.style.position = "absolute";
+        dot.style.width = `${size}px`;
+        dot.style.height = `${size}px`;
+        dot.style.background = i % 3 === 0 ? "#52ffbc" : i % 2 === 0 ? "#ff8f5f" : "#69a7ff";
+        dot.style.left = `${(Math.sin(time / 800 + i) + 1) * 40 + (i * 12) % 120}px`;
+        dot.style.top = `${(Math.cos(time / 900 + i) + 1) * 30 + (i * 8) % 90}px`;
+        dot.style.boxShadow = "0 0 8px currentColor";
+        map.appendChild(dot);
+      }
+    }
+
+    function updateLog() {
+      const now = new Date();
+      const stamp = now.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
+      const events = [
+        "GRID FLUX STABLE",
+        "AUX CHANNEL ALIGNED",
+        "DATA PULSE CONFIRMED",
+        "ION STREAM CLEAN",
+        "VECTOR SCAN COMPLETE"
+      ];
+      const entry = document.createElement("div");
+      entry.textContent = `${stamp} // ${events[Math.floor(Math.random() * events.length)]}`;
+      log.prepend(entry);
+      while (log.children.length > 5) log.removeChild(log.lastChild);
+    }
+
+    function updateFooter() {
+      const now = new Date();
+      clockEl.textContent = now.toLocaleTimeString("pl-PL");
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      const hrs = String(Math.floor(elapsed / 3600)).padStart(2, "0");
+      const mins = String(Math.floor((elapsed % 3600) / 60)).padStart(2, "0");
+      const secs = String(elapsed % 60).padStart(2, "0");
+      uptimeEl.textContent = `${hrs}:${mins}:${secs}`;
+      driftEl.textContent = (Math.sin(Date.now() / 1200) * 0.08 + 0.05).toFixed(3);
+    }
+
+    let lastLog = 0;
+    function animate(time) {
+      drawBackground(time);
+      drawScope(time);
+      updateMap(time);
+      updateFooter();
+      if (time - lastLog > 3500) {
+        updateLog();
+        lastLog = time;
+      }
+      requestAnimationFrame(animate);
+    }
+
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>
